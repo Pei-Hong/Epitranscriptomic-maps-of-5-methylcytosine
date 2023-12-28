@@ -1,5 +1,5 @@
 # Epitranscriptomic-maps-of-5-methylcytosine
-This is the bioinformatical analysis pipline associated with "Epitranscriptomic maps of 5-methylcytosine reveal substrate diversity of NSUN methyltransferases and links to mRNA translation and turnover
+This is the bioinformatical analysis pipline associated with article "Epitranscriptomic maps of 5-methylcytosine reveal substrate diversity of NSUN methyltransferases and links to mRNA translation and turnover"
 
 ## 1. Establishment of union m5C set from public datasets
 ### 1.1 Requirements
