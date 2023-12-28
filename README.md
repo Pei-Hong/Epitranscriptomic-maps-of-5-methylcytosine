@@ -105,7 +105,7 @@ for i in 20 30 50 70; do for f in all_eCLIP_K562/*_${i}_0.txt; do awk -v r=$i '{
 ```
 
 ## 4. UPF1 knockdown RNA-seq and differential expression analysis
-The analysis pipeline can be found in `script1.sh`.
+The analysis pipeline can be found in `UPF1kd_script.sh`.
 The raw reads were subjected to FastQC (v0.11.9). Low-quality bases and adaptor sequences were removed using Trimmomatic (v0.38) with options (ILLUMINCLIP:Adapter.fa:2:30:10:8:true LEADING:3 TRAILING:3 SLIDINGWINDOW: 4:20 MINLEN:50). Clean reads were mapped to 4S rRNA using bowtie2 (v2.3.5) with parameters (‘-q --sensitive --reorder --no-unal --un-conc-gz’). Unmapped reads were mapped to hg38 genome using HISAT2 (v2.1.0) with parameters (‘--no-softclip --score-min L,-16,0 --mp 7,7 --rfg 0,7 --rdg 0,7 --max-seeds 20 -k5 --dta’). The mapped reads were processed to featureCounts (v2.0.1) for feature counting. 
 To quantify RNA, fragment abundance in genes with ≥50 mapped reads were selected and normalized using the size factors estimated by the median of all genes implemented in the DESeq2 (v1.30.1) Bioconductor package. Differential expression analysis was performed by DESeq2. Genes with log2(fold change) ≥ 1.2 and adjusted p-value ≤ 0.05 were regarded as differentially expressed genes.
 
