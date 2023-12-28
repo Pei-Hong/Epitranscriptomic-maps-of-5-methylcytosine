@@ -73,6 +73,16 @@ fimo --oc NSUN6_motif --verbosity 4 --thresh 0.05 NSUN6.meme 15sample_m5C.21.fa
 ```
 For potential NSUN5-dependent sites, we used NSUN5-overexpression and epigenetically silenced NSUN5 data in LN229 cells Janin et al., (2019), and regarded sites with 0.05 methylation ratio increase and methylation level higher than 0.1 in NSUN5-OE group are potential NSUN5-dependent sites. All the consensus motifs are plotted by ggseqlogo (Wagih, 2017) in R script `m5C_distribution.R`.
 
+The RNA secondary structures are predicted by RNAfold:
+```
+awk 'NR==FNR{a[$4]=$0}NR!=FNR{if($8":"$9 in a) print a[$8":"$9]"\t"$2}' gencode.v32.annotation.temp 15sample_m5C.annot | cut -f1-8,11 | Get_sequence_around.py -s - --type around --seq_len 25 --out_type bed12 | cut -f1-12 | bedtools getfasta -fi /data/rnomics8/peihong/2020_m5C/fasta_chromsome/hg38_chromsomes.fa -s -name -bed - -split  | awk '{if($1 !~ />chr/ && length($2) == 51) {gsub("T|t", "U", $1); print toupper($1)} else print}' > 15sample_m5C.51.fa
+
+cat RNAfold/15sample_m5C.51.RNAfold | paste - - -| awk 'NR==FNR{a[$1]=$3}NR!=FNR{if($1 in a) print $1"\t"$2"\t"$3"\t"a[$1]}' 15sample_m5C.21.label -  > 15sample_m5C.51.RNAfold.label
+
+RNAfold ../15sample_m5C.51.fa --noPS  > 15sample_m5C.51.RNAfold
+cat RNAfold/15sample_m5C.51.RNAfold | paste - - -| awk 'NR==FNR{a[$1]=$3}NR!=FNR{if($1 in a && length($3) == 51) print $1"\t"$2"\t"$3"\t"a[$1]}' 15sample_m5C.21.label - > 15sample_m5C.51.RNAfold.label
+```
+
 ## 3. Proximity to RBP binding sites.
 RBP footprints reported by (Van Nostrand et al., 2020) were downloaded from ENCODE; ALYREF footprints in HeLa cells line were obtained from CLIPdb database (Yang et al., 2015) as a positive control. For ENCODE datasets, the intersections of two biological replicates with fold-enrichment ≥ 4 and p ≤ 10-3, were filtered as significant peaks and the middle sites of the peaks were regarded as RBP binding sites. 
 Genes with both RBP binding sites and m5C sites were considered for enrichment analysis. Bins were divided around RBP binding sites with the number of m5C sites and total C within the bins. Then Fisher’s exact test was applied to calculate the enrichment significance. We set up a gradient region as ±20 nt, ±30 nt, ±50 nt, and ±70 nt, to test the influence of bin size. Finally, ±50 nt was used for further analysis. The relative distance of m5C sites to RBP binding sites was identified as well as the background C within the same region to get the distribution of m5C around RBP binding sites.
@@ -105,7 +115,7 @@ for i in 20 30 50 70; do for f in all_eCLIP_K562/*_${i}_0.txt; do awk -v r=$i '{
 ```
 
 ## 4. UPF1 knockdown RNA-seq and differential expression analysis
-The analysis pipeline can be found in `UPF1kd_script.sh`.
+The analysis pipeline can be found in `UPF1kd_script.sh` and R script `20220210_UPF1kd.R`.
 The raw reads were subjected to FastQC (v0.11.9). Low-quality bases and adaptor sequences were removed using Trimmomatic (v0.38) with options (ILLUMINCLIP:Adapter.fa:2:30:10:8:true LEADING:3 TRAILING:3 SLIDINGWINDOW: 4:20 MINLEN:50). Clean reads were mapped to 4S rRNA using bowtie2 (v2.3.5) with parameters (‘-q --sensitive --reorder --no-unal --un-conc-gz’). Unmapped reads were mapped to hg38 genome using HISAT2 (v2.1.0) with parameters (‘--no-softclip --score-min L,-16,0 --mp 7,7 --rfg 0,7 --rdg 0,7 --max-seeds 20 -k5 --dta’). The mapped reads were processed to featureCounts (v2.0.1) for feature counting. 
 To quantify RNA, fragment abundance in genes with ≥50 mapped reads were selected and normalized using the size factors estimated by the median of all genes implemented in the DESeq2 (v1.30.1) Bioconductor package. Differential expression analysis was performed by DESeq2. Genes with log2(fold change) ≥ 1.2 and adjusted p-value ≤ 0.05 were regarded as differentially expressed genes.
 
