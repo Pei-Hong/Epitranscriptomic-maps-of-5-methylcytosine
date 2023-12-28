@@ -120,5 +120,5 @@ The raw reads were subjected to FastQC (v0.11.9). Low-quality bases and adaptor 
 To quantify RNA, fragment abundance in genes with ≥50 mapped reads were selected and normalized using the size factors estimated by the median of all genes implemented in the DESeq2 (v1.30.1) Bioconductor package. Differential expression analysis was performed by DESeq2. Genes with log2(fold change) ≥ 1.2 and adjusted p-value ≤ 0.05 were regarded as differentially expressed genes.
 
 ## 5. License
-Copyright (C) 2022 YangLab. Licensed GPLv3 for open source use or contact YangLab (yanglab@@picb.ac.cn) for commercial use
+Copyright (C) 2022 YangLab. Licensed GPLv3 for open source use or contact YangLab (yanglab@@picb.ac.cn) for commercial use.
 
