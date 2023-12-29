@@ -1,0 +1,294 @@
+#!/bin/bash
+helpdoc(){
+    cat <<EOF
+Description:
+	RAPID pipeline.
+Usage:
+    software -m <Build|Annot|Distance|Enrich> [options]
+    -h/---help  -- help information
+
+Module:         Build
+Options: -g hg38 --gtf hg39.gtf --iso
+ -g          -- Prefix of output genome reference
+ --gtf       -- gene annotation file (GTF format, recomannd GENOCODE 
+                annotation with "gene_name" and "gene_type" tags)
+ --iso	     -- Add isoform ids behand gene name
+ 
+Module:         Annot
+Options: -i studiedFile.bed -f FunctionalFile -g hg38 -o OUTDIR
+ -i          -- bed6 format file for sites studied.
+ -f          -- bed6 format file for regions with biological functions 
+                or a dictionary content bed6 format files.
+ -g          -- Genome reference for "software".
+ -s			 -- Annoted sites by strand.
+ -o          -- Directory for outputs, the default is "software_annot".
+
+Module:         Distance
+Options: -i studiedFile.bed -f FunctionalFile -g hg38 –mature –o OUTDIR
+ --annotFiles -- The output for "Annot" module, which could be one file or
+                a directory content the files.
+ -g          -- Genome reference for "software".
+ -o          -- Directory for outputs, the default is "software_dis".
+ --start_site -- Distance is calculated between a start site and your studied  
+                sites. You can specify the start site of a certain region 
+                ('5utr', 'cds' and '3utr'). And can also specify a 'custom' 
+                site as the start site. If you choose 'custom', please add 
+                the sites on col10 of file.annot.
+
+Module:         Enrich 
+Options: -i studiedFile.bed -f FunctionalFile -g hg38 --mature --model prop --extend 50 –o object --type around/left/right --start 0  
+ --annotFiles -- Directory for annotted files, which is the output for 
+                 "Annot" module. In the directory, it should be ONLY ONE or NO
+                 "study.annot" file. If aimed "study.annot" file is not in the 
+                 directory you can specify it via "-i".
+ -i          -- Studied file which is supposed to be annotated by "Annot" module.
+                If '-i' is set, the "study.annot" file in "annotFiles" would be 
+                IGNORED.
+ -g          -- Genome reference for "software".
+ --fa        -- Fasta file for genome.
+ -o          -- Directory for outputs, the default is "software_enrich"
+ --mature    -- If chose, the relative distance on mature RNA would be 
+                calculated, the default is precursor RNA.
+ --model     -- Statistal model, "chisq" for Chi-Squared test, "binom" for 
+                Binomial Test and "prop" for Z-test, the default is "prop".
+ -b          -- Background nucleotide, you should set one of "T|C|G|A" as the background 
+                nucleotide.
+ --extend    -- Int value, extend the region, default is 0.
+ --type      -- You can choose around/left/right to set the direction to 
+                extend, effective only when "extend" >= 0. 
+                The default is "around".
+ --start     -- Int value, set up the start site of the extension.
+ --outOverlaps -- Choose to output the sites overlapped by functional regions.
+ -p          -- Number of the threads you want to use.
+
+Version: 1.0 2022/04/06
+Author: Pei-Hong Zhang Email: zhangpeihong@picb.ac.cn
+EOF
+}
+
+if [ $# = 0 ]; then
+    helpdoc
+    exit 1
+fi
+
+#default parameters:
+MODULE="NULL" 
+StudyFile="NULL"
+FunctionFile="NULL" 
+Genome="NULL" 
+OUTDIR="software_out" 
+# FunctionFile_Dir="NULL" 
+BACKGROUND="N"
+MATURE="pre"
+MODEL="prop"
+EXTEND=0
+# MID=0
+TYPE="around" 
+START=0
+FASTA="NULL"
+annotFiles="NULL"
+outOverlaps=0
+start_site="NULL"
+Strand="F"
+p=1
+
+#get command line parameters
+ARGS=`getopt -o m:i:f:g:o:b:h:p:s --long gtf:,fa:,annotFiles:,mature,model:,extend:,type:,start:,outOverlaps,start_site:,help -n "$0" -- "$@"`
+eval set -- "$ARGS"
+while true ; do
+	case "$1" in
+		-m) MODULE=$2 ; shift 2;;
+		-i) StudyFile=$2 ; shift 2;;
+		-f) FunctionFile=$2 ; shift 2;;
+		-g) Genome=$2 ; shift 2;;
+		--annotFiles) annotFiles=$2 ; shift 2;;
+		-s) Strand="T" ; shift 1;;
+		-o) OUTDIR=$2 ; shift 2;;
+		--gtf) GTF=$2 ; shift 2;;
+		--fa) FASTA=$2 ; shift 2;;
+		--mature) MATURE="mature" ; shift ;;
+		--model) MODEL=$2 ; shift 2;;
+		-b) BACKGROUND=$2 ; shift 2;;
+		--extend) EXTEND=$2 ; shift 2;;
+		--type) TYPE=$2 ; shift 2;;
+		--start) START=$2 ; shift 2;;
+		--outOverlaps) outOverlaps=1 ; shift 1;;
+		--start_site) start_site=$2 ; shift 2;;
+		-p) p=$2 ; shift 2;;
+		-h) helpdoc ; exit 1;;
+		--help) helpdoc ; exit 1;;
+		--)
+			shift
+			break
+			;;
+		*) echo "unknown parameter:" $1; helpdoc; exit 1;;
+	esac
+done
+
+if [ $MODULE == "NULL" ];then
+	helpdoc; exit 1
+fi
+
+#get path of software and package install 
+# if [ -z "$SCAPTUREPATH" ]; then
+# #	echo "scapture path is not set. Try to find scapture in current ENV"
+# 	SCAPTUREPATH=$(which scapture)
+# 	if [[ "$SCAPTUREPATH" == *scapture ]]; then
+# #		echo "scapture is found in: "$SCAPTUREPATH
+# 		SCAPTUREPATH=${SCAPTUREPATH%scapture}
+# 	else
+# 		echo "scapture is not found!"
+# 		exit 1
+# 	fi
+# fi
+
+software_path=`which software`
+export PATH=${software_path%/software}/src:$PATH
+
+#<Build|Annot|Distance|Enrich>
+if [ $MODULE == "Build" ];then
+	if [[ $Genome != "NULL" && $GTF != "NULL" ]];then
+		software-build.sh -g $Genome --gtf $GTF
+	else
+		echo "The -gtf and -g options should be applied values."
+		helpdoc; exit 1
+	fi
+fi
+
+if [ $MODULE == "Annot" ]; then
+	if [ $OUTDIR == "NULL" ];then OUTDIR="software_annot" ; fi
+	if [[ $StudyFile != "NULL" && $Genome != "NULL" ]];then
+		software-Annot.sh -i $StudyFile -f $FunctionFile -g $Genome -o $OUTDIR -s $Strand
+	elif [[ $FunctionFile != "NULL" && $Genome != "NULL" ]];then
+		software-Annot.sh -i $StudyFile -f $FunctionFile -g $Genome -o $OUTDIR -s $Strand
+	else
+		echo "The -i and -g options should be applied values."
+		helpdoc; exit 1
+	fi
+fi
+
+if [ $MODULE == "Distance" ]; then
+	if [ $OUTDIR == "NULL" ];then OUTDIR="software_dis" ; fi
+	if [[ $annotFiles != "NULL" && $Genome != "NULL" && $start_site != "NULL" ]];then
+		# echo $start_site
+		if [[ $start_site != "3utr" && $start_site != "5utr" && $start_site != "cds" && $start_site != "custom" ]];then
+			echo "--start_site should be one of 3utr|5utr|cds|custom !"
+		else
+			software-Distance.sh --annotFiles $annotFiles -g $Genome -o $OUTDIR --start_site $start_site
+		fi
+	else
+		echo "The --annotFiles, --start_site and -g options should be applied values."
+		helpdoc; exit 1
+	fi
+fi
+
+if [ $MODULE == "Enrich" ]; then
+	if [ $OUTDIR == "NULL" ];then OUTDIR="software_enrich" ; fi
+	if [[ $annotFiles != "NULL" && $Genome != "NULL" && $FASTA != "NULL" ]];then
+		if [ $StudyFile == "NULL" ]; then
+			ls ${annotFiles}/*.study.annot > /dev/null 2>&1
+			check=`echo $?`
+			if [ $check == 0 ]; then
+				StudyFile=`ls ${annotFiles}/*.study.annot`
+			else
+				echo "The file.study.annot should be supplied by --annotFiles or -i."
+				helpdoc; exit 1
+			fi
+		fi
+		ls ${annotFiles}/*.function.annot > /dev/null 2>&1
+		check=`echo $?`
+		if [ $check != 0 ]; then
+			echo "The file.function.annot should be contented in the directory supplied by --annotFiles."
+			helpdoc; exit 1
+		else
+			mkdir -p ${OUTDIR}
+			echo sample$'\t'Genome$'\t'MATURE$'\t'MODEL$'\t'EXTEND$'\t'TYPE$'\t'START$'\t'study_overlap$'\t'study_per$'\t'function_overlap$'\t'function_per$'\t'N_study_overlap$'\t'N_study_not_overlap$'\t'N_bg_overlap$'\t'N_bg_not_overlap > ${OUTDIR}/${Genome}_${MATURE}_${MODEL}_${TYPE}_${EXTEND}_${START}.temp.txt
+			for file in ${annotFiles}/*.function.annot; do
+				echo "${software_path%/software}/src/software-Enrich.sh --annotFiles $file -i $StudyFile -g $Genome --fa $FASTA --mature $MATURE --model $MODEL -b $BACKGROUND --extend $EXTEND -o $OUTDIR --type $TYPE --start $START --outOverlaps $outOverlaps" 
+			done > ${OUTDIR}/script_tmp.sh
+
+			cat ${OUTDIR}/script_tmp.sh | parallel -j $p >> ${OUTDIR}/${Genome}_${MATURE}_${MODEL}_${TYPE}_${EXTEND}_${START}.temp.txt
+
+			Rscript ${software_path%/software}/src/${MODEL}Test.r ${OUTDIR}/${Genome}_${MATURE}_${MODEL}_${TYPE}_${EXTEND}_${START}.temp.txt
+			rm ${OUTDIR}/${Genome}_${MATURE}_${MODEL}_${TYPE}_${EXTEND}_${START}.temp.txt
+			# rm ${OUTDIR}/script_tmp.sh
+		fi
+	else
+		echo "The --annotFiles,--fa and -g options should be applied values."
+		helpdoc; exit 1
+	fi
+fi
+
+if [ $MODULE == "Test" ]; then
+	if [ $OUTDIR == "NULL" ];then OUTDIR="software_enrich" ; fi
+	if [[ $annotFiles != "NULL" && $Genome != "NULL" && $FASTA != "NULL" ]];then
+		if [ $StudyFile == "NULL" ]; then
+			ls ${annotFiles}/*.study.annot > /dev/null 2>&1
+			check=`echo $?`
+			if [ $check == 0 ]; then
+				StudyFile=`ls ${annotFiles}/*.study.annot`
+			else
+				echo "The file.study.annot should be supplied by --annotFiles or -i."
+				helpdoc; exit 1
+			fi
+		fi
+		ls ${annotFiles}/*.function.annot > /dev/null 2>&1
+		check=`echo $?`
+		if [ $check != 0 ]; then
+			echo "The file.function.annot should be contented in the directory supplied by --annotFiles."
+			helpdoc; exit 1
+		else
+			mkdir -p ${OUTDIR}
+			echo sample$'\t'Genome$'\t'MATURE$'\t'MODEL$'\t'EXTEND$'\t'TYPE$'\t'START$'\t'study_overlap$'\t'study_per$'\t'function_overlap$'\t'function_per$'\t'N_study_overlap$'\t'N_study_not_overlap$'\t'N_bg_overlap$'\t'N_bg_not_overlap > ${OUTDIR}/${Genome}_${MATURE}_${MODEL}_${TYPE}_${EXTEND}_${START}.temp.txt
+			for file in ${annotFiles}/*.function.annot; do
+				echo "${software_path%/software}/src/RBP_enrich_test.sh --annotFiles $file -i $StudyFile -g $Genome --fa $FASTA --mature $MATURE --model $MODEL -b $BACKGROUND --extend $EXTEND -o $OUTDIR --type $TYPE --start $START --outOverlaps $outOverlaps" 
+			done > ${OUTDIR}/script_tmp.sh
+
+			cat ${OUTDIR}/script_tmp.sh | parallel -j $p >> ${OUTDIR}/${Genome}_${MATURE}_${MODEL}_${TYPE}_${EXTEND}_${START}.temp.txt
+
+			Rscript ${software_path%/software}/src/${MODEL}Test.r ${OUTDIR}/${Genome}_${MATURE}_${MODEL}_${TYPE}_${EXTEND}_${START}.temp.txt
+			# rm ${OUTDIR}/${Genome}_${MATURE}_${MODEL}_${TYPE}_${EXTEND}_${START}.temp.txt
+			# rm ${OUTDIR}/script_tmp.sh
+		fi
+	else
+		echo "The --annotFiles,--fa and -g options should be applied values."
+		helpdoc; exit 1
+	fi
+fi
+
+if [ $MODULE == "Test2" ]; then
+	if [ $OUTDIR == "NULL" ];then OUTDIR="software_enrich" ; fi
+	if [[ $annotFiles != "NULL" && $Genome != "NULL" && $FASTA != "NULL" ]];then
+		if [ $StudyFile == "NULL" ]; then
+			ls ${annotFiles}/*.study.annot > /dev/null 2>&1
+			check=`echo $?`
+			if [ $check == 0 ]; then
+				StudyFile=`ls ${annotFiles}/*.study.annot`
+			else
+				echo "The file.study.annot should be supplied by --annotFiles or -i."
+				helpdoc; exit 1
+			fi
+		fi
+		ls ${annotFiles}/*.function.annot > /dev/null 2>&1
+		check=`echo $?`
+		if [ $check != 0 ]; then
+			echo "The file.function.annot should be contented in the directory supplied by --annotFiles."
+			helpdoc; exit 1
+		else
+			mkdir -p ${OUTDIR}
+
+			for file in ${annotFiles}/*.function.annot; do
+				echo "${software_path%/software}/src/Get_gene_m6A.sh --annotFiles $file -i $StudyFile -g $Genome --fa $FASTA --mature $MATURE --model $MODEL -b $BACKGROUND --extend $EXTEND -o $OUTDIR --type $TYPE --start $START --outOverlaps $outOverlaps" 
+			done > ${OUTDIR}/script_tmp.sh
+
+			cat ${OUTDIR}/script_tmp.sh | parallel -j $p 
+
+			# Rscript ${software_path%/software}/src/${MODEL}Test.r ${OUTDIR}/${Genome}_${MATURE}_${MODEL}_${TYPE}_${EXTEND}_${START}.temp.txt
+			# # rm ${OUTDIR}/${Genome}_${MATURE}_${MODEL}_${TYPE}_${EXTEND}_${START}.temp.txt
+			# # rm ${OUTDIR}/script_tmp.sh
+		fi
+	else
+		echo "The --annotFiles,--fa and -g options should be applied values."
+		helpdoc; exit 1
+	fi
+fi

@@ -1,0 +1,2 @@
+software -m Build -g hg38 --gtf /picb/rnomics4/peihong/hg38_index/genecode_v32/basic/gencode.v32.basic.annotation.gtf
+
